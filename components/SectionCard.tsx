@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 interface SectionCardProps {
   number: number;
   title: string;
@@ -7,9 +9,9 @@ interface SectionCardProps {
 
 export default function SectionCard({ number, title, description, href }: SectionCardProps) {
   return (
-    <a href={href} className="border p-4 rounded-lg hover:bg-gray-100">
+    <Link href={href} className="border p-4 rounded-lg hover:bg-gray-100 block">
       <h2>{number}. {title}</h2>
       <p>{description}</p>
-    </a>
+    </Link>
   )
 }
