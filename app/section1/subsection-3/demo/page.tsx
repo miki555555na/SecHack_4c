@@ -68,72 +68,119 @@ function ChartLine({ data, labels, hideXAxis }: { data: TimePoint[]; labels?: st
   );
 }
 
+
 export default function DemoPage() {
+  // ローディング状態は表示用途のみにして入力の無効化はしない
+
   // Experience 1 (left input / right chart)
-  const [lastTime1, setLastTime1] = useState<number | null>(null);
   const [timings1, setTimings1] = useState<number[]>([]);
   const [value1, setValue1] = useState("");
 
   // Experience 2 (right input / left chart)
-  const [lastTime2, setLastTime2] = useState<number | null>(null);
   const [timings2, setTimings2] = useState<number[]>([]);
   const [value2, setValue2] = useState("");
 
   const candidateWords = ["happy", "hurry", "harpy"];
 
-  // Challenge state
+  // Challenge state (ここは変更なし)
   const [challengeWord, setChallengeWord] = useState<string | null>(null);
   const [challengeTimings, setChallengeTimings] = useState<number[] | null>(null);
   const [choices, setChoices] = useState<string[]>([]);
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
 
-  function onKeyDown1(e: React.KeyboardEvent<HTMLInputElement>) {
-    const now = Date.now();
-    if (lastTime1 !== null) {
-      const delta = now - lastTime1;
-      setTimings1(prev => [...prev, delta]);
+  // APIを叩く共通関数 (キーストローク送信)
+  const sendKeystroke = async (sessionId: 'exp1' | 'exp2'): Promise<number> => {
+    try {
+      const res = await fetch('/api/keystroke', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sessionId }),
+      });
+      if (!res.ok) {
+        throw new Error('API request failed');
+      }
+      const data = await res.json();
+      return data.observedDelta;
+    } catch (error) {
+      console.error(error);
+      return -1; // エラー時は負の値を返すなど
     }
-    setLastTime1(now);
+  };
+
+  // APIを叩く共通リセット関数
+  const resetKeystrokeSession = async (sessionId: 'exp1' | 'exp2') => {
+    try {
+      await fetch('/api/keystroke/reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId: sessionId }),
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+
+  function onKeyDown1(e: React.KeyboardEvent<HTMLInputElement>) {
+    // 非表示キー（Shift, Ctrl など）は計測しない
+    const k = e.key;
+    if (
+      k === 'Shift' || k === 'Control' || k === 'Alt' || k === 'Meta' ||
+      k === 'Tab' || k === 'Enter' || k.startsWith('Arrow')
+    ) return;
+
+    // サーバー計測を非同期に呼び出す（入力はブロックしない）
+    sendKeystroke('exp1').then(delta => {
+      if (delta > 0) setTimings1(prev => [...prev, delta]);
+    }).catch(() => {});
   }
 
   function onChange1(e: React.ChangeEvent<HTMLInputElement>) {
     setValue1(e.target.value);
     if (e.target.value.length === 0) {
-      setLastTime1(null);
+      // サーバーセッションのリセットも行う (非同期だが待たない)
+      resetKeystrokeSession('exp1'); 
       setTimings1([]);
     }
   }
 
-  function clear1() {
-    setLastTime1(null);
+  async function clear1() {
+    // サーバーセッションのリセット
+    await resetKeystrokeSession('exp1');
     setTimings1([]);
     setValue1("");
   }
 
   function onKeyDown2(e: React.KeyboardEvent<HTMLInputElement>) {
-    const now = Date.now();
-    if (lastTime2 !== null) {
-      const delta = now - lastTime2;
-      setTimings2(prev => [...prev, delta]);
-    }
-    setLastTime2(now);
+    const k = e.key;
+    if (
+      k === 'Shift' || k === 'Control' || k === 'Alt' || k === 'Meta' ||
+      k === 'Tab' || k === 'Enter' || k.startsWith('Arrow')
+    ) return;
+
+    sendKeystroke('exp2').then(delta => {
+      if (delta > 0) setTimings2(prev => [...prev, delta]);
+    }).catch(() => {});
   }
 
   function onChange2(e: React.ChangeEvent<HTMLInputElement>) {
     setValue2(e.target.value);
     if (e.target.value.length === 0) {
-      setLastTime2(null);
+      // サーバーセッションのリセットも行う (非同期だが待たない)
+      resetKeystrokeSession('exp2');
       setTimings2([]);
     }
   }
 
-  function clear2() {
-    setLastTime2(null);
+  async function clear2() {
+    // サーバーセッションのリセット
+    await resetKeystrokeSession('exp2');
     setTimings2([]);
     setValue2("");
   }
 
+  // ... (generateChallenge, submitAnswer は変更なし) ...
   function shuffle<T>(arr: T[]) {
     return arr.slice().sort(() => Math.random() - 0.5);
   }
@@ -155,6 +202,7 @@ export default function DemoPage() {
     setResult(selectedChoice === challengeWord ? '正解！' : `不正解（正解: ${challengeWord}）`);
   }
 
+  // ... (グラフ用のデータ生成(points1, etc) は変更なし) ...
   const points1: TimePoint[] = timings1.map((t, i) => ({ idx: i, time: t }));
   const points2: TimePoint[] = timings2.map((t, i) => ({ idx: i, time: t }));
   const challengePoints: TimePoint[] = (challengeTimings ?? []).map((t, i) => ({ idx: i, time: t }));
@@ -173,6 +221,7 @@ export default function DemoPage() {
   const labels1 = pairLabelsFromWord(value1, timings1.length);
   const labels2 = pairLabelsFromWord(value2, timings2.length);
   const challengeLabels = pairLabelsFromWord(challengeWord, (challengeTimings ?? []).length);
+
 
   return (
     <main className="p-8 space-y-6 bg-white text-black">
