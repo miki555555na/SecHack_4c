@@ -23,8 +23,8 @@ export default function TimingDemo(): JSX.Element {
   const [cfg, setCfg] = useState({
     runs: 100,
     perCharDelayMs: 1.0, // ms（各一致文字あたりの同期遅延）
-    bins: 50,
-    maxMs: 50, // ヒストグラムの最大値（ms）
+    bins: 10,
+    maxMs: 15, // ヒストグラムの最大値（ms）
     unit: 'ms' as 'ms' | 'us'
   });
   function updateCfg<K extends keyof typeof cfg>(k: K, v: typeof cfg[K]) {
@@ -46,6 +46,24 @@ export default function TimingDemo(): JSX.Element {
       }
     }
     return true;
+  }
+
+  // secureCompare: 各一致文字ごとに cfg.perCharDelayMs を挿入（同期的な busy-wait）
+  function secureCompare(a: string, b: string): boolean {
+    let result = true;
+    const len = Math.max(a.length, b.length);
+    // ノイズ追加（±0.1ms のランダムノイズ）
+    const noise = randomInt(-100, 101) * 0.005;
+    const perCharDelayMs = cfg.perCharDelayMs + noise;
+    for (let i = 0; i < 10; i++) {
+      if (i >= a.length || i >= b.length) result = false;
+      if (a[i] !== b[i]) result=false; // early return on first mismatch
+      const start = performance.now();
+      while (performance.now() - start < perCharDelayMs) {
+        /* busy-wait */
+      }
+    }
+    return result;
   }
 
   // ヒストグラム生成（単位は cfg.unit で切替可能）
@@ -136,7 +154,7 @@ export default function TimingDemo(): JSX.Element {
     const durations: number[] = []; // ms
     for (let i = 0; i < cfg.runs; i++) {
       const t0 = performance.now();
-      insecureCompare(secret, input);
+      secureCompare(secret, input);
       const t1 = performance.now();
       durations.push(t1 - t0);
       if ((i + 1) % Math.max(1, Math.floor(cfg.runs / 10)) === 0) {

@@ -105,7 +105,7 @@ export default function TimingAttackPage(): JSX.Element {
         </div>
 
         <p>攻撃者はこの微妙な時間差を測定することで、先頭から順に正解文字を推測できます。</p>
-        <p>demo: 正解文字列「S3CRET」</p>
+        <p>demo: 正解文字列「S3CRET」 PW最大文字数：10文字</p>
         {/* Insert the interactive demo (client-side) */}
         <div style={{ marginTop: 18 }}>
           <TimingDemo />
