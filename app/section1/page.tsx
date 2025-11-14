@@ -1,6 +1,7 @@
 // app/page.tsx
 import React from 'react';
-import TimingDemo from './demo';
+import InsecureDemo from './InsecureDemo';
+import SecureDemo from './SecureDemo';
 
 export const metadata = {
   title: 'タイミング攻撃チュートリアル',
@@ -105,10 +106,57 @@ export default function TimingAttackPage(): JSX.Element {
         </div>
 
         <p>攻撃者はこの微妙な時間差を測定することで、先頭から順に正解文字を推測できます。</p>
-        <p>demo: 正解文字列「S3CRET」 PW最大文字数：10文字</p>
-        {/* Insert the interactive demo (client-side) */}
+        <p>demo: 正解文字列「S3CR3T」 PW最大文字数：10文字</p>
+
+        <h3 style={styles.h3}>問題のあるコード（insecureCompare）</h3>
+        <p>以下は早期リターン（early return）を行うため、タイミング攻撃に脆弱です。</p>
+        <pre style={styles.code}>
+{`function insecureCompare(a: string, b: string): boolean {
+  const len = Math.max(a.length, b.length);
+  const noise = randomInt(-100, 101) * 0.005;
+  const perCharDelayMs = cfg.perCharDelayMs + noise;
+  for (let i = 0; i < len; i++) {
+    if (i >= a.length || i >= b.length) return false;
+    if (a[i] !== b[i]) return false; // early return on first mismatch
+    const start = performance.now();
+    while (performance.now() - start < perCharDelayMs) {
+      /* busy-wait */
+    }
+  }
+  return true;
+}`}
+        </pre>
+
+        <h4 style={styles.h4}>差が出るグラフ</h4>
+        {/* Insert the insecure demo (client-side) */}
         <div style={{ marginTop: 18 }}>
-          <TimingDemo />
+          <InsecureDemo />
+        </div>
+
+        <h3 style={{ ...styles.h3, marginTop: 24 }}>安全なコード（secureCompare）</h3>
+        <p>以下は固定回数のループを行い、タイミング情報の漏洩を軽減します。</p>
+        <pre style={styles.code}>
+{`function secureCompare(a: string, b: string): boolean {
+  let result = true;
+  const len = Math.max(a.length, b.length);
+  const noise = randomInt(-100, 101) * 0.005;
+  const perCharDelayMs = cfg.perCharDelayMs + noise;
+  for (let i = 0; i < 10; i++) {
+    if (i >= a.length || i >= b.length) result = false;
+    if (a[i] !== b[i]) result = false; // no early return
+    const start = performance.now();
+    while (performance.now() - start < perCharDelayMs) {
+      /* busy-wait */
+    }
+  }
+  return result;
+}`}
+        </pre>
+
+        <h4 style={styles.h4}>差が出ないグラフ</h4>
+        {/* Insert the secure demo (client-side) */}
+        <div style={{ marginTop: 18 }}>
+          <SecureDemo />
         </div>
 
       </section>
@@ -161,6 +209,11 @@ const styles: { [k: string]: React.CSSProperties } = {
   h3: {
     fontSize: 15,
     margin: '10px 0 6px'
+  },
+  h4: {
+    fontSize: 14,
+    margin: '12px 0 6px',
+    color: '#333'
   },
   code: {
     display: 'block',
