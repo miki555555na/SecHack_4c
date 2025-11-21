@@ -25,9 +25,9 @@ export const styles: { [k: string]: CSSProperties } = {
         textAlign: 'center',
         marginBottom: 28
     },
-        h1: {
-        fontSize: 36,
-        margin: '0 0 6px'
+    h1: {
+    fontSize: 30,
+    margin: '0 0 6px'
     },
     lead: {
         margin: 0,
@@ -41,7 +41,7 @@ export const styles: { [k: string]: CSSProperties } = {
         background: '#fbfbfb',
         border: '1px solid #ececec'
     },
-        comparison: {
+    comparison: {
         display: 'flex',
         gap: 24,
         marginTop: 20
@@ -51,15 +51,15 @@ export const styles: { [k: string]: CSSProperties } = {
         minWidth: 0
     },
     h2: {
-        fontSize: 26,
+        fontSize: 23,
         margin: '0 0 10px'
     },
     h3: {
-        fontSize: 22,
+        fontSize: 21,
         margin: '10px 0 6px'
     },
     h4: {
-        fontSize: 19,
+        fontSize: 15,
         margin: '12px 0 6px',
         color: '#333'
     },

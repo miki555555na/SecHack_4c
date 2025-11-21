@@ -13,7 +13,8 @@ type Props = {
 };
 
 export default function SectionLayout({
-    title,
+    title1,
+    title2,
     description,
     checklist,
     children,
@@ -33,7 +34,8 @@ export default function SectionLayout({
         {/* ▲ やることリスト */}
 
         <header style={styles.header}>
-            <h1 style={styles.h1}>{title}</h1>
+            <h1 style={styles.h1}>{title1}</h1>
+            <h2 style={styles.h2}>{title2}</h2>
             {description && (
             <p style={styles.lead}>{description}</p>
             )}
