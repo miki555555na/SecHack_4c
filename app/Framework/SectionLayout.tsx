@@ -4,11 +4,12 @@ import React from 'react';
 import { styles } from './SectionStyles';
 
 type Props = {
-    title: string;               // ページタイトル
-    description?: string;        // ページ説明
-    checklist?: React.ReactNode; // やることリスト
-    children: React.ReactNode;   // Section 内のコンテンツ
-    summary?: React.ReactNode;  // まとめ
+    title1: string;                // ページタイトル
+    title2?: string;               // サブタイトル
+    description?: React.ReactNode; // ページ説明
+    checklist?: React.ReactNode;   // やることリスト
+    children: React.ReactNode;     // Section 内のコンテンツ
+    summary?: React.ReactNode;     // まとめ
     stickyChecklist?: boolean;
 };
 
@@ -35,7 +36,7 @@ export default function SectionLayout({
 
         <header style={styles.header}>
             <h1 style={styles.h1}>{title1}</h1>
-            <h2 style={styles.h2}>{title2}</h2>
+            {title2 && <h2 style={styles.h2}>{title2}</h2>}
             {description && (
             <p style={styles.lead}>{description}</p>
             )}

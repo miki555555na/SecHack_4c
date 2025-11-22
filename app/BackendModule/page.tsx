@@ -19,7 +19,7 @@ export default function BackendMenu() {
         </button>
 
         <button onClick={() => router.push('/BackendModule/Part3')}>
-          Part3：
+          Part3：ユーザー存在チェックの時間差
         </button>
       </div>
     </main>
