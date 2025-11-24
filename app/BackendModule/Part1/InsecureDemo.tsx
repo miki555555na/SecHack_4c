@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 
 // randomInt の代替実装（min以上max未満の整数を返す）
 function randomInt(min: number, max: number): number {
@@ -10,10 +10,12 @@ function randomInt(min: number, max: number): number {
   window.crypto.getRandomValues(array);
   return min + (array[0] % range);
 }
+export type DemoRef = {
+  run: () => void;
+};
 
-export function InsecureDemo() {
+export const InsecureDemo = forwardRef<DemoRef, {input: string}>(({input}, ref) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [input, setInput] = useState('Sxxxx'); // default guess
   const [avgTime, setAvgTime] = useState<number | null>(null);
   const [countsSummary, setCountsSummary] = useState<number[]>([]);
   const secret = 'S3CR3T'; // vulnerable secret
@@ -116,9 +118,11 @@ export function InsecureDemo() {
   }, [countsSummary]);
 
   // 実行関数
-  async function runConfigured() {
-    const durations: number[] = [];
-    for (let i = 0; i < cfg.runs; i++) {
+  const runConfigured = useCallback(async () => {
+    const durations = [];
+    const target = input; // <--- 親から渡された input prop を使用
+    const MAX_RUNS = cfg.runs;
+    for (let i = 0; i < MAX_RUNS; i++) {
       const t0 = performance.now();
       insecureCompare(secret, input);
       const t1 = performance.now();
@@ -135,12 +139,16 @@ export function InsecureDemo() {
     // ヒストグラム作成
     const counts = buildHistogram(durations);
     setCountsSummary(counts);
-  }
+  }, [input, secret, cfg.runs, cfg.perCharDelayMs, cfg.bins, cfg.maxMs]);
+
+  useImperativeHandle(ref, () => ({
+    run: runConfigured
+  }));
 
   return (
     <div style={{ height: 350, maxHeight:'100%', padding: 15, background: '#fff', borderRadius: 8, border: '1px solid #e5e7eb', boxSizing:'border-box' }}>
       {/* 入力エリア */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20 }}>
+      {/* <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 20 }}>
         <label style={{ fontSize: 24, fontWeight: 600 }}>入力:</label>
         <input
           value={input}
@@ -168,7 +176,7 @@ export function InsecureDemo() {
         >
           実行
         </button>
-      </div>
+      </div> */}
 
       {/* 平均時間 */}
       {avgTime !== null && (
@@ -185,10 +193,10 @@ export function InsecureDemo() {
       {/* グラフ */}
       <canvas
         ref={canvasRef}
-        width={400} // 4. グラフの幅を縮小
-        height={150} // 5. グラフの高さを縮小
+        width={500} // 4. グラフの幅を縮小
+        height={250} // 5. グラフの高さを縮小
         style={{ display: 'block', margin: '0 auto' }}
       />
     </div>
   );
-}
+});

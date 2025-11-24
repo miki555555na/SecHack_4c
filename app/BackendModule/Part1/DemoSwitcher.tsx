@@ -1,11 +1,24 @@
 'use client';
-import React, { useState } from 'react';
-import { InsecureDemo } from './InsecureDemo';
+import React, { useState, useRef, useCallback } from 'react';
+import { InsecureDemo, DemoRef } from './InsecureDemo';
 import { SecureDemo } from './SecureDemo';
 import { styles } from '../../Framework/SectionStyles';
 
 export default function DemoSwitcher() {
     const [mode, setMode] = useState<'insecure' | 'secure'>('insecure');
+    const [input, setInput] = useState('Sxxxx'); // default guess
+
+    const insecureRef = useRef<DemoRef | null>(null);
+    const secureRef = useRef<DemoRef | null>(null);
+
+    //現在のモードに応じて対応するデモを実行
+    const handleRun = useCallback(() => {
+        if (mode === 'insecure' && insecureRef.current) {
+            insecureRef.current.run();
+        } else if (mode === 'secure' && secureRef.current) {
+            secureRef.current.run();
+        }
+    }, [mode]);
 
     const btnBase: React.CSSProperties = {
         padding: '8px 12px',
@@ -63,18 +76,61 @@ export default function DemoSwitcher() {
                     ✓ 安全な実装
                 </button>
             </div>
+            <div style={{ 
+                display: 'flex', 
+                gap: 16, 
+                alignItems: 'center', 
+                marginBottom: 20, 
+                padding: '10px 0',
+                borderTop: '1px dashed #ccc', 
+                paddingTop: 20,
+            }}>
+                <label style={{ fontSize: 24, fontWeight: 600, minWidth: 80 }}>推測入力:</label>
+                <input
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="パスワードを入力"
+                    style={{
+                        padding: '12px 16px',
+                        fontSize: 22,
+                        flexGrow: 1,
+                        border: '2px solid #ddd',
+                        borderRadius: 6,
+                        boxSizing: 'border-box'
+                    }}
+                />
+                <button
+                    onClick={handleRun}
+                    style={{
+                        padding: '12px 28px',
+                        fontSize: 22,
+                        fontWeight: 600,
+                        background: '#3b82f6', 
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                        flexShrink: 0,
+                    }}
+                >
+                    実行
+                </button>
+            </div>
 
             <div>
+                {/* inputとrefを子に渡す */}
                 {mode === 'insecure' ? (
                     <div>
-                        <InsecureDemo />
+                        <InsecureDemo input={input} ref={insecureRef} />
                     </div>
                 ) : (
                     <div>
-                        <SecureDemo />
+                        <SecureDemo input={input} ref={secureRef} />
                     </div>
                 )}
             </div>
+            
         </div>
         </section>
     );
