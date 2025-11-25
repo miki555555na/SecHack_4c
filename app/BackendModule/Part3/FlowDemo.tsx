@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 type Variant = 'vulnerable' | 'secure';
 
@@ -34,11 +34,37 @@ const userDb: Record<string, string> = {
   carol: 'S3CR3T'
 };
 
+const sampleUsers: { label: string; username: string; password: string }[] = [
+  { label: '正しいパスワード', username: 'alice', password: 'pass1234' },
+  { label: '誤ったパスワード', username: 'alice', password: 'wrongpass' },
+  { label: '存在しないユーザー', username: 'ghost', password: 'guessme' }
+];
+
+// 表示時間を意図的に長めにするためのスケール
+const DISPLAY_SCALE = 6;
+const MIN_DISPLAY_MS = 900;
+
 const steps: { id: StepId; label: string }[] = [
   { id: 'exist', label: '存在チェック' },
   { id: 'password', label: 'パスワード照合' },
   { id: 'token', label: 'トークン生成' }
 ];
+
+const codeSnippets: Record<Variant, Record<StepId, string>> = {
+  vulnerable: {
+    exist: "if (!db.has(user)) return fail('ユーザーなし'); // ① ここで早期終了",
+    password:
+      "const ok = verifyPass(db.get(user).hash, pass); // ② 重い処理は存在する人だけ\nif (!ok) return fail('パスワード不一致'); // 途中終了",
+    token: 'return issueToken(user); // ③ 成功時のみ実行'
+  },
+  secure: {
+    exist:
+      "const exists = db.has(user);\nconst hash = exists ? db.get(user).hash : dummyHash; // ダミーで全員同じ重さ",
+    password:
+      "const ok = constantTimeVerify(hash, pass); // 定数時間比較\nconst _token = issueTokenLikeWork(); // 成功/失敗に関わらず実行",
+    token: "sleepUntil(targetMs); // 最小応答時間で固定\nreturn exists && ok ? success() : fail('same latency');"
+  }
+};
 
 function randRange(min: number, max: number) {
   return Math.round(min + Math.random() * (max - min));
@@ -50,9 +76,10 @@ function simulateFlow(variant: Variant, username: string, password: string): Sim
   const passwordOk = exists && password === userDb[normalized];
 
   if (variant === 'vulnerable') {
-    const existTime = randRange(12, 28);
-    const pwTime = randRange(60, 110);
-    const tokenTime = randRange(30, 55);
+    // わざと時間差が見やすい値に引き上げる
+    const existTime = randRange(120, 180);
+    const pwTime = randRange(380, 620);
+    const tokenTime = randRange(220, 360);
 
     if (!exists) {
       return {
@@ -93,9 +120,9 @@ function simulateFlow(variant: Variant, username: string, password: string): Sim
   }
 
   // secure: すべての段階を同じ重さで実行（ダミー処理含む）
-  const existTime = randRange(60, 70);
-  const pwTime = randRange(70, 85);
-  const tokenTime = randRange(55, 70);
+  const existTime = randRange(300, 360);
+  const pwTime = randRange(330, 400);
+  const tokenTime = randRange(280, 340);
 
   return {
     steps: [
@@ -128,15 +155,19 @@ export function FlowDemo({ variant, accent, title, description }: Props) {
   const [running, setRunning] = useState(false);
   const timersRef = useRef<number[]>([]);
 
-  const maxTime = useMemo(() => {
-    if (!result) return 1;
-    return Math.max(1, ...result.steps.map((s) => s.time));
-  }, [result]);
-
   const clearTimers = () => {
     timersRef.current.forEach((t) => clearTimeout(t));
     timersRef.current = [];
   };
+
+  // パターン切替時は自動実行せず、状態だけリセット
+  useEffect(() => {
+    clearTimers();
+    setRunning(false);
+    setActiveStep(null);
+    setResult(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variant]);
 
   const run = () => {
     clearTimers();
@@ -147,12 +178,17 @@ export function FlowDemo({ variant, accent, title, description }: Props) {
     // 段階ごとの時間に応じてステップをハイライト
     let elapsed = 0;
     sim.steps.forEach((step) => {
-      const duration = step.executed ? step.time : 80;
-      const displayDuration = Math.max(160, duration * 4); // 見やすい長さにスケーリング
-      const timer = window.setTimeout(() => {
-        setActiveStep(step.id);
-      }, elapsed);
-      timersRef.current.push(timer);
+      const duration = step.executed ? step.time : 0;
+      const displayDuration = step.executed
+        ? Math.max(MIN_DISPLAY_MS, duration * DISPLAY_SCALE) // 体感用に大幅スロー
+        : 220; // 早期終了したステップは光らせず短く流す
+
+      if (step.executed) {
+        const timer = window.setTimeout(() => {
+          setActiveStep(step.id);
+        }, elapsed);
+        timersRef.current.push(timer);
+      }
       elapsed += displayDuration;
     });
 
@@ -164,10 +200,9 @@ export function FlowDemo({ variant, accent, title, description }: Props) {
   };
 
   useEffect(() => {
-    run();
     return () => clearTimers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [variant]);
+  }, []);
 
   const activeLabel = activeStep ? steps.find((s) => s.id === activeStep)?.label ?? '' : '';
 
@@ -179,154 +214,180 @@ export function FlowDemo({ variant, accent, title, description }: Props) {
       </div>
       <div style={{ fontSize: 15, color: '#475569', marginBottom: 12 }}>{description}</div>
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
-        <label style={{ fontWeight: 600 }}>username</label>
-        <input
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          style={{ padding: '10px 12px', fontSize: 16, borderRadius: 8, border: '1px solid #cbd5e1', minWidth: 140 }}
-        />
-        <label style={{ fontWeight: 600 }}>password</label>
-        <input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          style={{ padding: '10px 12px', fontSize: 16, borderRadius: 8, border: '1px solid #cbd5e1', minWidth: 160 }}
-        />
-        <button
-          onClick={run}
-          disabled={running}
-          style={{
-            padding: '10px 18px',
-            fontWeight: 700,
-            color: '#fff',
-            background: running ? '#94a3b8' : accent,
-            border: 'none',
-            borderRadius: 10,
-            cursor: running ? 'not-allowed' : 'pointer',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
-          }}
-        >
-          {running ? '計測中...' : 'この条件で試行'}
-        </button>
-      </div>
-
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          marginBottom: 12,
-          padding: '10px 12px',
-          borderRadius: 12,
-          background: '#0f172a',
-          color: '#e2e8f0',
-          boxShadow: '0 6px 16px rgba(0,0,0,0.25)'
-        }}
-      >
-        <div
-          style={{
-            width: 12,
-            height: 12,
-            borderRadius: '50%',
-            background: running ? '#22c55e' : '#94a3b8',
-            boxShadow: running ? '0 0 0 8px rgba(34,197,94,0.18)' : 'none',
-            transition: 'all 0.2s ease'
-          }}
-        />
-        <div style={{ fontWeight: 700 }}>
-          {running ? `サーバー処理中: ${activeLabel || '準備中…'}` : 'サーバー待機中'}
-        </div>
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 10, marginBottom: 14 }}>
-        {steps.map((step) => {
-          const res = result?.steps.find((s) => s.id === step.id);
-          const isActive = activeStep === step.id;
-          const color = res ? barColor(res, accent) : '#e2e8f0';
-          const borderColor = isActive ? accent : '#cbd5e1';
-          return (
-            <div
-              key={step.id}
-              style={{
-                border: `2px solid ${borderColor}`,
-                borderRadius: 10,
-                padding: 10,
-                background: '#f8fafc',
-                boxShadow: isActive ? `0 0 0 4px ${accent}22` : 'none',
-                transition: 'all 0.2s ease'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                <div style={{ width: 12, height: 12, borderRadius: '50%', background: color }} />
-                <div style={{ fontWeight: 700 }}>{step.label}</div>
-              </div>
-              <div style={{ fontSize: 13, color: '#475569' }}>
-                {res
-                  ? !res.executed
-                    ? '実行されず'
-                    : res.status === 'dummy'
-                      ? 'ダミー処理'
-                      : res.status === 'pass'
-                        ? '実行'
-                        : '途中終了'
-                  : '---'}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {result && (
-        <>
-          <div style={{ display: 'grid', gap: 10, marginBottom: 12 }}>
-            {result.steps.map((step) => {
-              const width = step.time === 0 ? 4 : Math.max(12, Math.round((step.time / maxTime) * 100));
-              return (
-                <div key={step.id}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, color: '#475569' }}>
-                    <span>{step.label}</span>
-                    <span>{step.time.toFixed(0)} ms</span>
-                  </div>
-                  <div
-                    style={{
-                      height: 16,
-                      borderRadius: 8,
-                      background: '#e2e8f0',
-                      overflow: 'hidden',
-                      border: '1px solid #e2e8f0'
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: `${width}%`,
-                        height: '100%',
-                        background: barColor(step, accent),
-                        transition: 'width 0.3s ease'
-                      }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 16, alignItems: 'start' }}>
+        {/* 左：ログインフォームと状態 */}
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, padding: 14, background: '#f8fafc' }}>
+          <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: 8 }}>ログインを試す</div>
+          <div style={{ display: 'grid', gap: 8, marginBottom: 8 }}>
+            <label style={{ fontWeight: 600, fontSize: 14, color: '#475569' }}>username</label>
+            <input
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="例: alice"
+              style={{ padding: '10px 12px', fontSize: 16, borderRadius: 8, border: '1px solid #cbd5e1' }}
+            />
+            <label style={{ fontWeight: 600, fontSize: 14, color: '#475569' }}>password</label>
+            <input
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="例: pass1234"
+              style={{ padding: '10px 12px', fontSize: 16, borderRadius: 8, border: '1px solid #cbd5e1' }}
+            />
           </div>
 
-          <div
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 8, marginBottom: 12 }}>
+            {sampleUsers.map((s) => (
+              <button
+                key={s.label}
+                type="button"
+                onClick={() => {
+                  setUsername(s.username);
+                  setPassword(s.password);
+                }}
+                style={{
+                  padding: '9px 11px',
+                  borderRadius: 10,
+                  border: '1px solid #cbd5e1',
+                  background:
+                    username === s.username && password === s.password ? `${accent}15` : '#f8fafc',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  color: '#0f172a',
+                  fontWeight: 600,
+                  textAlign: 'left',
+                  boxShadow:
+                    username === s.username && password === s.password
+                      ? `0 0 0 3px ${accent}22`
+                      : '0 2px 6px rgba(0,0,0,0.04)',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={run}
+            disabled={running}
             style={{
-              padding: '10px 12px',
+              width: '100%',
+              padding: '12px 14px',
+              fontWeight: 700,
+              color: '#fff',
+              background: running ? '#94a3b8' : accent,
+              border: 'none',
               borderRadius: 10,
-              background: '#f8fafc',
-              border: '1px solid #cbd5e1',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              fontWeight: 700
+              cursor: running ? 'not-allowed' : 'pointer',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              transition: 'background 0.2s ease'
             }}
           >
-            <span style={{ color: '#0f172a' }}>{result.message}</span>
-            <span style={{ color: accent }}>{result.total.toFixed(0)} ms</span>
+            {running ? '計測中...' : 'この条件で試行'}
+          </button>
+        </div>
+
+        {/* 右：段階の可視化 */}
+        <div>
+          <div style={{ display: 'grid', gap: 8, alignItems: 'flex-end', justifyItems: 'end', marginBottom: 12 }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: 10,
+                padding: '10px 12px',
+                borderRadius: 12,
+                background: '#0f172a',
+                color: '#e2e8f0',
+                boxShadow: '0 6px 16px rgba(0,0,0,0.25)',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}
+            >
+              <div
+                style={{
+                  width: 12,
+                  height: 12,
+                  borderRadius: '50%',
+                  background: running ? '#22c55e' : '#94a3b8',
+                  boxShadow: running ? '0 0 0 8px rgba(34,197,94,0.18)' : 'none',
+                  transition: 'all 0.2s ease'
+                }}
+              />
+              <div style={{ fontWeight: 700, textAlign: 'right', flex: 1 }}>
+                {running ? `サーバー処理中: ${activeLabel || '準備中…'}` : 'サーバー待機中'}
+              </div>
+            </div>
+
           </div>
-        </>
-      )}
+
+          <div style={{ marginBottom: 14 }}>
+            <div
+              style={{
+                border: '1px solid #e2e8f0',
+                borderRadius: 12,
+                background: '#0b1220',
+                color: '#e2e8f0',
+                padding: '12px 14px',
+                fontFamily: 'monospace',
+                fontSize: 13,
+                lineHeight: 1.6,
+                boxShadow: '0 8px 20px rgba(0,0,0,0.08)'
+              }}
+            >
+              {steps.map((step) => {
+                const isActive = activeStep === step.id;
+                const code = codeSnippets[variant][step.id];
+                return (
+                  <div
+                    key={step.id}
+                    style={{
+                      padding: '8px 10px',
+                      marginBottom: 6,
+                      borderRadius: 10,
+                      background: isActive ? `${accent}33` : 'transparent',
+                      border: isActive ? `1px solid ${accent}` : '1px solid #1e293b',
+                      boxShadow: isActive ? `0 0 0 4px ${accent}22` : 'none',
+                      transition: 'all 0.2s ease'
+                    }}
+                  >
+                    <div style={{ color: '#94a3b8', marginBottom: 4 }}>{step.label}</div>
+                    <div style={{ color: '#e2e8f0', whiteSpace: 'pre-wrap' }}>{code}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {!running && (
+            <div
+              style={{
+                padding: '10px 12px',
+                borderRadius: 10,
+                background: '#fff',
+                border: '1px solid #e2e8f0',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'flex-end',
+                gap: 6,
+                fontWeight: 700,
+                textAlign: 'right',
+                width: '100%',
+                boxSizing: 'border-box'
+              }}
+            >
+              <span style={{ color: '#0f172a' }}>
+                {result ? result.message : 'まだ実行していません'}
+              </span>
+              <span style={{ color: accent, fontSize: 18 }}>
+                {result ? `${result.total.toFixed(0)} ms` : '--- ms'}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

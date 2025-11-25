@@ -23,7 +23,9 @@ export default function DemoSwitcher() {
     const btnBase: React.CSSProperties = {
         padding: '8px 12px',
         borderRadius: 6,
-        border: '1px solid #d1d5db',
+        borderWidth: 1,
+        borderStyle: 'solid',
+        borderColor: '#d1d5db',
         background: '#fff',
         cursor: 'pointer',
         fontWeight: 600
