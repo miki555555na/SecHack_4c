@@ -10,7 +10,6 @@ type Props = {
     checklist?: React.ReactNode;   // やることリスト
     children: React.ReactNode;     // Section 内のコンテンツ
     summary?: React.ReactNode;     // まとめ
-    stickyChecklist?: boolean;
 };
 
 export default function SectionLayout({
@@ -20,13 +19,12 @@ export default function SectionLayout({
     checklist,
     children,
     summary,
-    stickyChecklist
 }: Props) {
     return (
     <main style={styles.page}>
         {/* ▼ やることリスト */}
         {checklist && (
-            <div style={stickyChecklist ? styles.todoWrapper : undefined}>
+            <div style={styles.todoWrapper }>
                 <section style={{ ...styles.section, background: 'transparent', border: 'none', marginBottom: 0, marginTop: 0, padding: 0 }}>
                 {checklist}
                 </section>

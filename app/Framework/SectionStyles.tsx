@@ -12,7 +12,6 @@ export const styles: { [k: string]: CSSProperties } = {
         fontSize: 17
     },
     todoWrapper: {
-        position: 'sticky',
         top: 0,
         zIndex: 100,
         background: '#f5faffff',
