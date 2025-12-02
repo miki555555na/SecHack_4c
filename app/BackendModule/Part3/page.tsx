@@ -54,7 +54,6 @@ export default function AuthFlowTimingPage() {
       title2="段階フロー“可視化”＋時間差の原因追跡デモ"
       description={description}
       checklist={checklist}
-      stickyChecklist
       summary={summary}
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
