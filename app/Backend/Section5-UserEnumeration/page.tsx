@@ -50,7 +50,7 @@ export default function AuthFlowTimingPage() {
 
   return (
     <SectionLayout
-      title1="3. ユーザー存在チェックや段階的認証フローの処理時間差"
+      title1="5. ユーザー存在チェックや段階的認証フローの処理時間差"
       title2="段階フロー“可視化”＋時間差の原因追跡デモ"
       description={description}
       checklist={checklist}

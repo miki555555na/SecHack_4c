@@ -46,7 +46,7 @@ export default function TimingAttackPage() {
     const checklist = (
         <Card style={{ border: '2px solid #aee2feff', boxShadow: '0 2px 8px #0001',background: '#f5faffff',}}>
             <CardHeader style={{ paddingBottom: 3}}>
-                <CardTitle style={{ fontSize: 19, marginTop: 0 }}>📝 1章の見どころ</CardTitle>
+                <CardTitle style={{ fontSize: 19, marginTop: 0 }}>📝 3章の見どころ</CardTitle>
             </CardHeader>
             <CardContent style={{ paddingTop: 0 }}>
                 <ul style={{ fontSize: 17, marginLeft: 18, marginBottom: 0 }}>
@@ -342,7 +342,7 @@ export default function TimingAttackPage() {
 
     return(
     <SectionLayout
-        title1="1. 実行時間がパスワードを暴露！"
+        title1="3. 実行時間がパスワードを暴露！"
         title2='〜 早期リターンと可変長ループが招くタイミング攻撃 〜'
         description={description}
         checklist={checklist}
