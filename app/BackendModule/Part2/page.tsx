@@ -1,114 +1,110 @@
 "use client"
 
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import SectionLayout from '../../Framework/SectionLayout'
-import { FileJson, Server, ShieldAlert, ShieldCheck, Activity, Terminal, Database, CheckCircle, AlertTriangle, Code2, Clock, Lock, Search } from 'lucide-react'
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts'
+import { styles } from '../../Framework/SectionStyles'
+import { 
+  Shield, 
+  Unlock, 
+  Activity, 
+  Terminal, 
+  CheckCircle,
+  ArrowRight,
+  FileDigit,
+  KeyRound,
+  Layers,
+  Code2
+} from 'lucide-react'
+import AttackConsole from './AttackConsole'
+import ResponseChart from './ResponseChart'
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell, ReferenceLine } from 'recharts'
 
 // --- 設定値 ---
-const CORRECT_HMAC = '9f86d081' 
+const CORRECT_HMAC = 'b7f2a9c4' 
 const HMAC_LENGTH = 8
 const DELAY_PER_BYTE = 40 
 const HEX_CHARS = '0123456789abcdef'.split('')
-
-// --- コードスニペット定義 ---
-const SNIPPET_INSECURE = `// ❌ 危険な実装: Early Return (早期リターン)
-// 言語標準の文字列比較 (==, memcmp, strcmp)
-async function verify(received, expected) {
-  for (let i = 0; i < len; i++) {
-    // ⚠️ 1バイトでも不一致があれば即座に終了
-    if (received[i] !== expected[i]) {
-      return false; 
-      // 結果: 「何文字目まで合っていたか」が
-      // 処理時間として外部に漏洩する
-    }
-    await sleep(DELAY); // メモリ読み込み等の微小コスト
-  }
-  return true;
-}`
-
-const SNIPPET_SECURE = `// ⭕ 安全な実装: Constant Time (定数時間)
-// どのような入力でも必ず最後まで計算する
-async function verify(received, expected) {
-  let result = 0;
-  for (let i = 0; i < len; i++) {
-    // 🔄 XOR演算で差異を累積する
-    // 不一致があってもループを止めない！
-    result |= received[i] ^ expected[i];
-    
-    await sleep(DELAY); // 常に一定時間かかる
-  }
-  return result === 0;
-}`
 
 // --- ユーティリティ ---
 function sleep(ms: number) {
   return new Promise((res) => setTimeout(res, ms))
 }
 
-// サーバーサイド検証ロジック
-async function verifySignature(receivedSig: string, insecure: boolean) {
-  const expectedSig = CORRECT_HMAC 
-  const len = expectedSig.length
-
-  if (insecure) {
-    for (let i = 0; i < len; i++) {
-      if (receivedSig[i] === expectedSig[i]) {
-        await sleep(DELAY_PER_BYTE) 
-      } else {
-        return { ok: false, matchCount: i } 
-      }
-    }
-    return { ok: true, matchCount: len }
-  } else {
-    let result = 0;
-    for (let i = 0; i < len; i++) {
-      const a = receivedSig.charCodeAt(i) || 0
-      const b = expectedSig.charCodeAt(i)
-      result |= a ^ b
-      await sleep(DELAY_PER_BYTE) 
-    }
-    return { ok: result === 0, matchCount: len }
-  }
-}
-
-export default function Part2Page() {
+export default function HmacTimingAttackPage() {
   const [insecure, setInsecure] = useState(true)
   const [running, setRunning] = useState(false)
+  const [attackStatus, setAttackStatus] = useState<'idle' | 'running' | 'success' | 'fail'>('idle')
   const [logs, setLogs] = useState<string[]>([])
-  const [confirmed, setConfirmed] = useState<string>('0'.repeat(HMAC_LENGTH))
+  
+  const [crackedHmac, setCrackedHmac] = useState<string>('0'.repeat(HMAC_LENGTH))
   const [currentByteIndex, setCurrentByteIndex] = useState(0)
   const [tryingChar, setTryingChar] = useState('')
   const [chartData, setChartData] = useState<Array<{ char: string; time: number; isHit?: boolean }>>([])
   
   const abortRef = useRef(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [logs])
 
   function appendLog(line: string) {
-    setLogs((s) => [`> ${line}`, ...s].slice(0, 50))
+    setLogs((s) => [...s, line].slice(-50))
   }
 
-  function stopAttack() {
-    abortRef.current = true
-    setRunning(false)
-    appendLog("PROCESS ABORTED.")
+  // --- サーバーシミュレーション ---
+  async function mockServerVerify(receivedHmac: string, isInsecure: boolean) {
+    const expected = CORRECT_HMAC
+    const len = expected.length
+    const baseLatency = 15 
+
+    if (isInsecure) {
+      for (let i = 0; i < len; i++) {
+        if (receivedHmac[i] !== expected[i]) {
+          return { 
+            valid: false, 
+            latency: baseLatency + (i * DELAY_PER_BYTE) 
+          }
+        }
+        await sleep(DELAY_PER_BYTE)
+      }
+      return { valid: true, latency: baseLatency + (len * DELAY_PER_BYTE) }
+    } else {
+      let result = 0
+      for (let i = 0; i < len; i++) {
+        const a = receivedHmac.charCodeAt(i) || 0
+        const b = expected.charCodeAt(i)
+        result |= a ^ b
+        await sleep(DELAY_PER_BYTE)
+      }
+      return { 
+        valid: result === 0, 
+        latency: baseLatency + (len * DELAY_PER_BYTE) 
+      }
+    }
   }
 
+  // --- 攻撃実行 ---
   async function runAttack() {
     abortRef.current = false
     setRunning(true)
+    setAttackStatus('running')
     setLogs([])
     setChartData([])
-    let currentConfirmed = '0'.repeat(HMAC_LENGTH)
-    setConfirmed(currentConfirmed)
     
-    appendLog("INITIATING FORGERY ATTACK...")
-    appendLog(`TARGET: HMAC-SHA256 (Truncated)`)
-
+    let currentKnown = '0'.repeat(HMAC_LENGTH)
+    setCrackedHmac(currentKnown)
+    
+    appendLog(">> TARGET: Crypto API Endpoint")
+    appendLog(">> PAYLOAD: Tampered Data (role=admin)")
+    appendLog(">> START: Remote Timing Analysis...")
+    
     for (let pos = 0; pos < HMAC_LENGTH; pos++) {
       if (abortRef.current) break
       setCurrentByteIndex(pos)
-      appendLog(`[Byte ${pos}] Brute-forcing...`)
-
+      
       const roundMetrics: Array<{ char: string; time: number; isHit?: boolean }> = []
       let maxLatency = -1
       let bestCandidate = '0'
@@ -117,325 +113,310 @@ export default function Part2Page() {
         if (abortRef.current) break
         setTryingChar(hex)
 
-        const prefix = currentConfirmed.substring(0, pos)
-        const suffix = currentConfirmed.substring(pos + 1)
-        const payloadSig = prefix + hex + suffix
+        const prefix = currentKnown.substring(0, pos)
+        const suffix = currentKnown.substring(pos + 1)
+        const payloadHmac = prefix + hex + suffix
         
-        const t0 = performance.now()
-        const res = await verifySignature(payloadSig, insecure)
-        const t1 = performance.now()
-        const latency = Math.round(t1 - t0)
-
-        const isHit = insecure && (res.matchCount > pos) 
-        roundMetrics.push({ char: hex, time: latency, isHit })
+        const res = await mockServerVerify(payloadHmac, insecure)
+        const isHitInternal = insecure && (hex === CORRECT_HMAC[pos])
+        
+        roundMetrics.push({ char: hex, time: res.latency, isHit: isHitInternal })
         setChartData([...roundMetrics]) 
 
-        if (latency > maxLatency) {
-            maxLatency = latency
-            bestCandidate = hex
+        if (res.latency > maxLatency) {
+          maxLatency = res.latency
+          bestCandidate = hex
         }
-        await sleep(10)
+        await sleep(15)
       }
 
       if (abortRef.current) break
 
       if (insecure) {
-        appendLog(`[Byte ${pos}] HIT: '${bestCandidate}' (${maxLatency}ms)`)
-        const chars = currentConfirmed.split('')
+        appendLog(`[Byte ${pos}] LEAKAGE DETECTED: '${bestCandidate}' (${maxLatency}ms)`)
+        const chars = currentKnown.split('')
         chars[pos] = bestCandidate
-        currentConfirmed = chars.join('')
-        setConfirmed(currentConfirmed)
+        currentKnown = chars.join('')
+        setCrackedHmac(currentKnown)
       } else {
-        appendLog(`[Byte ${pos}] MISS: Latency uniform.`)
+        appendLog(`[Byte ${pos}] FAILED: No timing difference observed.`)
+        // 安全な場合はランダムな文字を入れて攻撃失敗を演出
         const randomHex = HEX_CHARS[Math.floor(Math.random() * HEX_CHARS.length)]
-        const chars = currentConfirmed.split('')
+        const chars = currentKnown.split('')
         chars[pos] = randomHex
-        currentConfirmed = chars.join('')
-        setConfirmed(currentConfirmed)
+        currentKnown = chars.join('')
+        setCrackedHmac(currentKnown)
       }
       
-      await sleep(200)
+      await sleep(100)
     }
 
-    const finalRes = await verifySignature(currentConfirmed, insecure)
-    if (finalRes.ok) {
-        appendLog("SUCCESS: Forgery accepted by server.")
+    const finalCheck = await mockServerVerify(currentKnown, insecure)
+    if (finalCheck.valid) {
+      setAttackStatus('success')
+      appendLog(">> RESULT: Signature Forged Successfully.")
+      appendLog(">> SYSTEM: Access Granted as Admin.")
     } else {
-        appendLog("FAILED: Invalid signature.")
+      setAttackStatus('fail')
+      appendLog(">> RESULT: Attack Failed.")
+      appendLog(">> SYSTEM: Invalid Signature.")
     }
     setRunning(false)
   }
 
-  // --- 技術解説セクション（大幅拡充） ---
-  const technicalSpecs = (
-    <div className="space-y-8 text-slate-200 mt-8">
-      
-      {/* Section 1: 根本原因の解説 */}
-      <section className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden">
-        <div className="bg-slate-950/50 p-4 border-b border-slate-700 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-red-400" />
-            <h3 className="font-bold text-lg text-white">なぜ「文字列比較」が脆弱性になるのか？</h3>
+  function stopAttack() {
+    abortRef.current = true
+    setRunning(false)
+    setAttackStatus('idle')
+    appendLog(">> ABORTED BY USER.")
+  }
+
+  // --- コンテンツ定義 ---
+
+  const description = (
+    <>
+        <b>署名検証ロジックの処理時間差（タイミング攻撃）</b>に起因する脆弱性について学習します。
+        <br/><br/>
+        HMACの比較処理において、文字が不一致だった時点で即座に処理を中断する<b>「早期リターン (Early Return)」</b>の実装になっていると、
+        処理にかかった時間のわずかな差から「何文字目まで合っているか」が外部に漏洩してしまいます。
+        <br/>
+        このセクションでは、そのメカニズムと、<b>定数時間比較 (Constant Time Comparison)</b> による対策をシミュレーションします。
+    </>
+  );
+
+  const cardBaseSmall: React.CSSProperties = { background: '#fff', padding: 15, borderRadius: 8, border: '1px solid #e5e7eb' };
+
+  const summary = (
+    <section style={{ ...styles.section, background: '#f9fafb', border: '1.5px solid #e5e7eb', marginTop: 32 }}>
+        <h2 style={{ ...styles.h2, fontSize: 22, marginBottom: 10 }}>📝 まとめ：サーバー側で行われている対策</h2>
+        <div style={{ fontSize: 16, marginLeft: 10, color: '#4b5563', marginBottom: 15 }}>
+            タイミング攻撃を防ぐためには、入力値によらず計算時間を一定に保つ必要があります。
         </div>
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div>
-                <h4 className="font-bold text-red-400 mb-3 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4"/> 
-                    標準比較 (Standard Comparison)
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 15 }}>
+            <div style={cardBaseSmall}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: 16, display: 'flex', alignItems: 'center', gap: 6, color: '#16a34a' }}>
+                    <CheckCircle size={18} /> 実装レベルの対策
                 </h4>
-                <p className="text-sm text-slate-300 leading-relaxed mb-4">
-                    多くのプログラミング言語の標準的な比較演算子（<code>==</code>, <code>===</code>, <code>strcmp</code>）は、パフォーマンス最適化のために<strong>「遅延評価（Lazy Evaluation）」</strong>を行います。
+                <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: '#374151', lineHeight: 1.6 }}>
+                    <li><b>定数時間比較 (Constant Time):</b> 文字列の不一致があっても途中で処理を止めず、必ず最後まで計算する。</li>
+                    <li><b>ライブラリの利用:</b> 実務では自作せず、言語標準の安全な関数を使う。
+                        <div style={{ background: '#e5e7eb', padding: '2px 6px', borderRadius: 4, fontFamily: 'monospace', fontSize: 12, marginTop: 4, display: 'inline-block' }}>
+                           Ex: crypto.timingSafeEqual(a, b)
+                        </div>
+                    </li>
+                </ul>
+            </div>
+            <div style={cardBaseSmall}>
+                <h4 style={{ margin: '0 0 8px 0', fontSize: 16, display: 'flex', alignItems: 'center', gap: 6, color: '#2563eb' }}>
+                    <Layers size={18} /> インフラ・運用レベルの対策
+                </h4>
+                <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: '#374151', lineHeight: 1.6 }}>
+                    <li><b>レート制限 (Rate Limiting):</b> 攻撃に必要な数千〜数万回のリクエスト自体を遮断する。</li>
+                    <li><b>人工的な遅延 (Random Jitter):</b> 意図的にランダムな遅延を付与し、統計的な解析を困難にする。</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+  );
+
+  const btnBase: React.CSSProperties = {
+    padding: '8px 12px',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderStyle: 'solid',
+    borderColor: '#d1d5db',
+    background: '#fff',
+    cursor: 'pointer',
+    fontWeight: 600
+  };
+  const active = { boxShadow: '0 0 0 3px rgba(99,102,241,0.08)' };
+  
+  const darkPanelBase: React.CSSProperties = { background: '#1f2937', borderRadius: 8, padding: 15, display: 'flex', flexDirection: 'column', color: '#e5e7eb' };
+  const targetInfoBase: React.CSSProperties = { background: '#000', padding: 10, borderRadius: 4, fontFamily: 'monospace', fontSize: 12, marginBottom: 15, border: '1px solid #374151' };
+  const hmacBoxBase: React.CSSProperties = { display: 'flex', gap: 4, justifyContent: 'center', background: '#111827', padding: 10, borderRadius: 4, border: '1px solid #374151' };
+  const logAreaBase: React.CSSProperties = { flex: 1, background: '#000', borderRadius: 4, padding: 8, overflowY: 'auto', fontFamily: 'monospace', fontSize: 11, color: '#d1d5db', border: '1px solid #374151' };
+  const rightPanelBase: React.CSSProperties = { background: '#fff', borderRadius: 8, padding: 15, border: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column' };
+
+  const children = (
+    <>
+      <section style={styles.section}>
+        <h2 style={styles.h2}>1. 脆弱性のメカニズム：署名検証の早期リターン</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+            {/* 左カラム: HMACの概念 */}
+            <div style={{ background: '#fff', padding: 20, borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                <h3 style={{ ...styles.h3, marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Shield size={20} color="#2563eb" /> HMACとは？
+                </h3>
+                <p style={{ fontSize: 15, color: '#374151', lineHeight: 1.6 }}>
+                    HMACは、データと「秘密鍵」を混ぜ合わせて作る署名です。
+                    単なるハッシュ値とは異なり、<b>「鍵を持つ正規のシステム」しか正しい署名を作れません。</b>
+                    これにより、データの改ざん防止（完全性）を保証します。
                 </p>
-                <div className="bg-black p-4 rounded font-mono text-sm space-y-1">
-                    <div className="flex gap-2">
-                        <span className="text-slate-500">Correct:</span>
-                        <span className="text-emerald-500">a</span>
-                        <span className="text-emerald-500">1</span>
-                        <span className="text-emerald-500">b</span>
-                        <span className="text-emerald-500">2</span>
+                <div style={{ marginTop: 15, padding: 10, background: '#f3f4f6', borderRadius: 6, fontSize: 13, display: 'flex', alignItems: 'center', gap: 10, justifyContent: 'center' }}>
+                    <div style={{ textAlign: 'center' }}>
+                        <FileDigit size={24} color="#6b7280" style={{ margin: '0 auto' }} />
+                        <div style={{ fontWeight: 600, color: '#374151' }}>Data</div>
                     </div>
-                    <div className="flex gap-2">
-                        <span className="text-slate-500">Input:  </span>
-                        <span className="text-emerald-500">a</span>
-                        <span className="text-emerald-500">1</span>
-                        <span className="text-red-500 font-bold">X</span>
-                        <span className="text-slate-700">?</span>
+                    <span style={{ fontSize: 20, color: '#9ca3af' }}>+</span>
+                    <div style={{ textAlign: 'center' }}>
+                        <KeyRound size={24} color="#eab308" style={{ margin: '0 auto' }} />
+                        <div style={{ fontWeight: 600, color: '#374151' }}>Secret Key</div>
                     </div>
-                    <div className="mt-2 text-red-400 text-xs border-t border-red-900/50 pt-2">
-                        → 3文字目で即座に停止 (Execution stops at index 2)
+                    <ArrowRight size={20} color="#9ca3af" />
+                    <div style={{ textAlign: 'center', background: '#2563eb', color: '#fff', padding: '4px 10px', borderRadius: 4 }}>
+                        <div style={{ fontWeight: 700 }}>HMAC</div>
                     </div>
                 </div>
             </div>
 
-            <div>
-                <h4 className="font-bold text-emerald-400 mb-3 flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4"/> 
-                    定数時間比較 (Constant-Time)
-                </h4>
-                <p className="text-sm text-slate-300 leading-relaxed mb-4">
-                    セキュリティ用途の比較関数（<code>crypto.timingSafeEqual</code> 等）は、入力が正解でも不正解でも、<strong>必ず全バイトをスキャン</strong>します。
+            {/* 右カラム: 攻撃者の狙い */}
+            <div style={{ background: '#fff', padding: 20, borderRadius: 8, border: '1px solid #e5e7eb' }}>
+                <h3 style={{ ...styles.h3, marginTop: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Unlock size={20} color="#dc2626" /> 攻撃者の狙い：署名の偽造
+                </h3>
+                <p style={{ fontSize: 15, color: '#374151', lineHeight: 1.6 }}>
+                    攻撃者は権限を「一般ユーザー」から「管理者」に書き換えたいと考えています。
+                    しかし、データ改ざんをするとHMAC署名も変わってしまいます。
+                    そこで、検証サーバーの応答時間を精密に計測し、<b>「書き換えたデータに対応する正しい署名」</b>を無理やり特定しようとします。
                 </p>
-                <div className="bg-black p-4 rounded font-mono text-sm space-y-1">
-                    <div className="flex gap-2">
-                        <span className="text-slate-500">Correct:</span>
-                        <span className="text-emerald-500">a</span>
-                        <span className="text-emerald-500">1</span>
-                        <span className="text-emerald-500">b</span>
-                        <span className="text-emerald-500">2</span>
+                <div style={{ marginTop: 10, padding: 10, background: '#fef2f2', border: '1px dashed #fca5a5', borderRadius: 6, fontSize: 13 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ color: '#6b7280' }}>Original:</span>
+                        <code>{`{ role: "user" }`}</code>
                     </div>
-                    <div className="flex gap-2">
-                        <span className="text-slate-500">Input:  </span>
-                        <span className="text-emerald-500">a</span>
-                        <span className="text-emerald-500">1</span>
-                        <span className="text-red-500">X</span>
-                        <span className="text-slate-500">?</span>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, color: '#dc2626' }}>
+                        <span>Tampered:</span>
+                        <code>{`{ role: "admin" }`}</code>
                     </div>
-                    <div className="mt-2 text-emerald-400 text-xs border-t border-emerald-900/50 pt-2">
-                        → 最後まで計算して結果を返す (Iterates full length)
+                    <div style={{ textAlign: 'center', marginTop: 8, color: '#dc2626', fontSize: 12 }}>
+                        ↑ この改ざんデータを通すための署名を探す！
                     </div>
                 </div>
             </div>
         </div>
       </section>
 
-      {/* Section 2: 解決策 (AEAD) */}
-      <section className="bg-indigo-950/30 border border-indigo-500/30 rounded-xl overflow-hidden">
-        <div className="bg-indigo-950/50 p-4 border-b border-indigo-500/30 flex items-center gap-2">
-            <Database className="w-5 h-5 text-indigo-400" />
-            <h3 className="font-bold text-lg text-white">実務での正しい対策：AEADの利用</h3>
-        </div>
-        <div className="p-6">
-            <p className="text-slate-600 text-sm mb-4 leading-relaxed">
-                比較関数を修正するのも一つの手ですが、よりモダンで安全なアプローチは、<strong>暗号化と認証を分離しない</strong>ことです。
-                <br/>認証付き暗号（AEAD: Authenticated Encryption with Associated Data）を使用すれば、ライブラリレベルで安全な検証が保証されます。
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-black/40 p-4 rounded border border-slate-700">
-                    <div className="text-xs text-slate-800 uppercase tracking-wider mb-1">Recommended Algorithm</div>
-                    <div className="text-emerald-400 font-bold font-mono">AES-GCM</div>
-                    <div className="text-xs text-slate-400 mt-2">高速かつハードウェア支援が効く標準的なAEAD。</div>
-                </div>
-                <div className="bg-black/40 p-4 rounded border border-slate-700">
-                    <div className="text-xs text-slate-800 uppercase tracking-wider mb-1">Alternative</div>
-                    <div className="text-emerald-400 font-bold font-mono">ChaCha20-Poly1305</div>
-                    <div className="text-xs text-slate-400 mt-2">モバイル端末等で高速。TLS 1.3でも採用。</div>
-                </div>
-                <div className="bg-black/40 p-4 rounded border border-slate-700">
-                    <div className="text-xs text-slate-800 uppercase tracking-wider mb-1">Avoid (Manual)</div>
-                    <div className="text-red-400 font-bold font-mono line-through">AES-CBC + HMAC</div>
-                    <div className="text-xs text-slate-400 mt-2">手動で組み合わせると「MAC-then-Encrypt」等の実装ミスを招きやすい。</div>
-                </div>
-            </div>
-        </div>
-      </section>
-    </div>
-  )
-
-  return (
-    <SectionLayout
-      title1="2. 署名偽造とタイミング攻撃"
-      title2="HMAC Verification & Forgery"
-      description="サーバーの検証ロジックが「処理時間」という情報を漏洩させてしまう脆弱性を体験します。危険なコードと安全なコードを切り替え、攻撃者の視点でその違いを観測してください。"
-      checklist={technicalSpecs}
-      stickyChecklist={false}
-    >
-      
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* Left Col: Attacker Control */}
-        <div className="lg:col-span-4 space-y-6">
-            {/* Target Card */}
-            <div className="bg-slate-900 border border-slate-700 p-5 rounded-xl shadow-lg relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-3 opacity-10"><FileJson className="w-20 h-20 text-emerald-400" /></div>
-                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">1. Target Payload</h3>
-                <div className="font-mono text-xs bg-black p-4 rounded border border-slate-700 text-emerald-400 whitespace-pre overflow-x-auto shadow-inner">
-{`POST /api/transfer HTTP/1.1
-Content-Type: application/json
-
-{
-  "from": "user_123",
-  "to": "attacker_wallet",
-  "amount": 10000000
+      {/* コード比較セクション */}
+      <section style={styles.section}>
+        <h2 style={styles.h2}>実装の比較：早期リターン vs 定数時間比較</h2>
+        <div style={styles.comparison}>
+            <div style={styles.comparisonColumn}>
+                <h3 style={{...styles.h3, textDecoration: 'underline'}}><b>早期リターン (Early Return)</b></h3>
+                <p style={{ fontSize: 16, marginBottom: 12 }}>
+                    不一致が見つかった瞬間に <code>return false</code> しています。
+                    この実装では「何文字目まで合っていたか」が処理時間に比例して漏洩します。
+                </p>
+                <div style={{ ...styles.codeContainer, background: '#fef2f2', border: '3px solid #fca5a5' }}>
+                    <div style={{ ...styles.codeLabel, color: '#dc2626' }}>⚠️ 脆弱なコード</div>
+                    <pre style={styles.code}>
+{`async function verifyHMAC(recv, exp) {
+  for (let i = 0; i < exp.length; i++) {
+    // 不一致なら即座にリターン (時間差が発生)
+    `}
+<span style={{ background: '#ef4444', color: '#fff', padding: '2px 4px', borderRadius: '3px', fontWeight: 'bold' }}>{`if (recv[i] !== exp[i]) return false;`}</span>
+{`
+    await sleep(PROCESSING_TIME);
+  }
+  return true;
 }`}
-                </div>
-                <div className="mt-3 text-xs text-slate-400">
-                    攻撃者はAPIリクエストを改ざんしました。受理されるには正しい署名が必要です。
-                </div>
-            </div>
-
-            {/* Attack Control */}
-            <div className="bg-slate-900 border border-slate-700 p-5 rounded-xl shadow-lg">
-                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-4">2. Attack Control</h3>
-                
-                <div className="mb-4">
-                    <span className="text-xs text-slate-400 block mb-2">Forged HMAC (Hex)</span>
-                    <div className="font-mono text-xl bg-black p-4 rounded border border-slate-600 flex items-center tracking-widest overflow-hidden shadow-inner">
-                        {confirmed.split('').map((char, idx) => (
-                            <span key={idx} className={`
-                                w-6 text-center transition-colors
-                                ${idx < currentByteIndex ? 'text-emerald-500 font-bold' : ''}
-                                ${idx === currentByteIndex && running ? 'text-yellow-400 bg-yellow-900/30' : 'text-slate-600'}
-                            `}>
-                                {idx === currentByteIndex && running ? tryingChar : char}
-                            </span>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-700 flex flex-col gap-4">
-                    <button
-                        onClick={running ? stopAttack : runAttack}
-                        className={`w-full py-3 rounded font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg
-                            ${running 
-                                ? 'bg-slate-700 text-slate-300 border border-slate-600' 
-                                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-900/40'
-                            }`}
-                    >
-                        {running ? 'ABORT ATTACK' : 'START BRUTE-FORCE'}
-                    </button>
-                </div>
-            </div>
-
-            {/* Console Output */}
-            <div className="h-48 bg-black border border-slate-700 rounded-xl p-4 font-mono text-xs overflow-y-auto custom-scrollbar shadow-inner">
-                {logs.length === 0 && <span className="text-slate-600">_ Ready for analysis.</span>}
-                {logs.map((log, i) => (
-                    <div key={i} className={`border-b border-slate-900/60 py-1 ${
-                        log.includes('SUCCESS') ? 'text-emerald-400 font-bold bg-emerald-900/10' :
-                        log.includes('FAILED') ? 'text-red-400' :
-                        log.includes('HIT') ? 'text-yellow-400 font-bold' :
-                        'text-slate-400'
-                    }`}>
-                        {log}
-                    </div>
-                ))}
-            </div>
-        </div>
-
-        {/* Right Col: Server Simulation */}
-        <div className="lg:col-span-8 flex flex-col gap-6">
-            
-            {/* Live Code Inspector */}
-            <div className="bg-slate-900 border border-slate-700 p-5 rounded-xl shadow-lg">
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                        <Code2 className="w-5 h-5 text-indigo-400" /> 
-                        Active Server Logic
-                    </h3>
-                    
-                    {/* Mode Toggle Switch */}
-                    <button 
-                        onClick={() => setInsecure(!insecure)}
-                        className={`text-xs px-3 py-1.5 rounded border font-bold transition-all flex items-center gap-2 ${insecure 
-                            ? 'bg-red-950/50 border-red-800 text-red-400 hover:bg-red-900/50' 
-                            : 'bg-emerald-950/50 border-emerald-800 text-emerald-400 hover:bg-emerald-900/50'}`}
-                    >
-                        {insecure ? (
-                           <><AlertTriangle className="w-3 h-3"/> Mode: Insecure (Vulnerable)</>
-                        ) : (
-                           <><CheckCircle className="w-3 h-3"/> Mode: Secure (Safe)</>
-                        )}
-                    </button>
-                </div>
-
-                {/* Code Block Area */}
-                <div className="relative group">
-                    <div className={`absolute top-0 left-0 w-1 h-full rounded-l ${insecure ? 'bg-red-500' : 'bg-emerald-500'}`} />
-                    <pre className="font-mono text-xs bg-black p-4 pl-6 rounded border border-slate-700 overflow-x-auto leading-relaxed shadow-inner transition-colors duration-300">
-                        <code className={insecure ? "text-red-100" : "text-emerald-100"}>
-                            {insecure ? SNIPPET_INSECURE : SNIPPET_SECURE}
-                        </code>
                     </pre>
                 </div>
             </div>
 
-            {/* Latency Visualizer */}
-            <div className="flex-1 bg-slate-900 border border-slate-700 p-5 rounded-xl shadow-lg flex flex-col relative">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
-                        <Activity className="w-5 h-5 text-indigo-400" /> 
-                        Response Latency (Execution Time)
-                    </h3>
-                    {running && (
-                        <div className="flex items-center gap-2 text-xs text-yellow-400 font-bold animate-pulse">
-                            <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
-                            Probing Byte {currentByteIndex}
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex-1 min-h-[250px] bg-black/40 rounded border border-slate-700 relative p-2">
-                    {chartData.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={chartData} margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
-                                <XAxis dataKey="char" stroke="#64748b" fontSize={12} tickLine={false} />
-                                <YAxis stroke="#64748b" fontSize={12} tickLine={false} unit="ms" />
-                                <Tooltip 
-                                    cursor={{fill: '#1e293b'}}
-                                    contentStyle={{backgroundColor: '#0f172a', borderColor: '#334155', color: '#f8fafc', fontSize: '12px'}}
-                                />
-                                <Bar dataKey="time" radius={[2, 2, 0, 0]}>
-                                    {chartData.map((entry, index) => (
-                                        <Cell 
-                                            key={`cell-${index}`} 
-                                            fill={entry.isHit ? '#10b981' : (insecure && entry.time > 100 ? '#f59e0b' : '#3b82f6')} 
-                                            stroke={entry.isHit ? '#34d399' : 'none'}
-                                        />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    ) : (
-                        <div className="absolute inset-0 flex items-center justify-center text-slate-600 flex-col gap-3">
-                            <Activity className="w-10 h-10 opacity-30" />
-                            <span className="text-sm">Waiting for traffic...</span>
-                        </div>
-                    )}
+            <div style={styles.comparisonColumn}>
+                <h3 style={{...styles.h3, textDecoration: 'underline'}}><b>定数時間比較 (Constant Time)</b></h3>
+                <p style={{ fontSize: 16, marginBottom: 12 }}>
+                    結果に関わらず、<b>必ず最後までループ</b>します。
+                    入力データによらず処理時間が一定になるため、外部から内部状態を推測することは不可能です。
+                </p>
+                <div style={{ ...styles.codeContainer, background: '#f0fdf4', border: '3px solid #86efac' }}>
+                    <div style={{ ...styles.codeLabel, color: '#16a34a' }}>✓ 安全なコード</div>
+                    <pre style={styles.code}>
+{`async function verifyHMAC(recv, exp) {
+  let result = 0;
+  for (let i = 0; i < exp.length; i++) {
+    // 途中でreturnせず、差異をXORで累積
+    `}
+<span style={{ background: '#22c55e', color: '#fff', padding: '2px 4px', borderRadius: '3px', fontWeight: 'bold' }}>{`result |= recv[i] ^ exp[i];`}</span>
+{`
+    await sleep(PROCESSING_TIME);
+  }
+  return result === 0;
+}`}
+                    </pre>
+                    <div style={{ marginTop: 8, fontSize: 12, color: '#166534', background: '#dcfce7', padding: '4px 8px', borderRadius: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Code2 size={14} /> 
+                        <span>Memo: 実務では <code>crypto.timingSafeEqual</code> 等の標準関数を使います。</span>
+                    </div>
                 </div>
             </div>
+        </div>
+      </section>
+
+      {/*デモ */}
+      <section style={{ ...styles.section, background: '#fff', border: '1px solid #e2e8f0' }}>
+        <h2 style={{ ...styles.h2, marginTop: 0, marginBottom: 15 }}>🚀 攻撃シミュレーション</h2>
+        <p style={{ marginBottom: 20 }}>
+            攻撃者が「時間差」を利用して入力データを推測する様子を観察します。
+            <b>脆弱な実装</b>では、正解の文字において処理時間のスパイク（突出）が観測されます。
+        </p>
+
+        {/* モード切替ボタン */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
+            <button
+                type="button"
+                onClick={() => { setInsecure(true); setAttackStatus('idle'); }}
+                style={{ ...btnBase, ...(insecure ? { borderColor: '#ef4444', background: '#fff7f7' } : {}), ...(insecure ? active : {}) }}
+            >
+                ⚠️ 脆弱な実装 (Early Return)
+            </button>
+            <button
+                type="button"
+                onClick={() => { setInsecure(false); setAttackStatus('idle'); }}
+                style={{ ...btnBase, ...(!insecure ? { borderColor: '#16a34a', background: '#f7fffb' } : {}), ...(!insecure ? active : {}) }}
+            >
+                ✓ 安全な実装 (Constant Time)
+            </button>
+        </div>
+
+        {/* デモ本体エリア */}
+        <div style={{ display: 'grid', gridTemplateColumns: '4fr 6fr', gap: 20, height: 450 }}>
+            
+            {/* 左: 攻撃者コンソール */}
+            <AttackConsole
+              darkPanelBase={darkPanelBase}
+              targetInfoBase={targetInfoBase}
+              hmacBoxBase={hmacBoxBase}
+              logAreaBase={logAreaBase}
+              attackStatus={attackStatus}
+              running={running}
+              crackedHmac={crackedHmac}
+              currentByteIndex={currentByteIndex}
+              tryingChar={tryingChar}
+              logs={logs}
+              scrollRef={scrollRef}
+              runAttack={runAttack}
+              stopAttack={stopAttack}
+              insecure={insecure}
+            />
+
+            {/* 右: 応答時間グラフ */}
+            <ResponseChart rightPanelBase={rightPanelBase} chartData={chartData} insecure={insecure} running={running} />
 
         </div>
-      </div>
+      </section>
+    </>
+  );
+
+  return (
+    <SectionLayout
+      title1="2. HMACタイミング攻撃"
+      title2="〜 署名検証の早期リターンによる情報漏洩 〜"
+      description={description}
+      summary={summary}
+      stickyChecklist={true}
+    >
+      {children}
     </SectionLayout>
   )
 }
