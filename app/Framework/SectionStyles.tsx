@@ -3,12 +3,12 @@ import { CSSProperties } from 'react';
 
 export const styles: { [k: string]: CSSProperties } = {
     page: {
-        maxWidth: 1400,
-        padding: '0 20px',
+        maxWidth: 1600,
+        padding: '0 8px',
         fontFamily: '"Noto Sans JP", "ヒラギノ角ゴ ProN", "Segoe UI", Roboto, sans-serif',
         color: '#111',
         lineHeight: 1.7,
-        fontSize: 16.5
+        fontSize: 18
     },
     todoWrapper: {
         top: 0,
@@ -27,13 +27,13 @@ export const styles: { [k: string]: CSSProperties } = {
         maxWidth: 900,
         margin: '0 auto 32px',
         color: '#444',
-        fontSize: 18,
+        fontSize: 19,
         lineHeight: 1.75,
         textAlign: 'left',
     },
     h1: {
-    fontSize: 30,
-    margin: '0 0 6px'
+        fontSize: 34,
+        margin: '0 0 6px'
     },
     lead: {
         margin: 0,
@@ -57,11 +57,11 @@ export const styles: { [k: string]: CSSProperties } = {
         minWidth: 0
     },
     h2: {
-        fontSize: 23,
+        fontSize: 26,
         margin: '0 0 10px'
     },
     h3: {
-        fontSize: 21,
+        fontSize: 22,
         margin: '10px 0 6px'
     },
     h4: {
@@ -88,7 +88,7 @@ export const styles: { [k: string]: CSSProperties } = {
         borderRadius: 6,
         overflowX: 'auto',
         fontFamily: 'monospace',
-        fontSize: 17,
+        fontSize: 16,
         lineHeight: 1.6,
         margin: 0
     },
@@ -125,4 +125,3 @@ export const styles: { [k: string]: CSSProperties } = {
         marginTop: 32
     }
     };
-
