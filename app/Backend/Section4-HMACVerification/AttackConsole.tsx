@@ -20,68 +20,51 @@ type Props = {
   insecure: boolean
 }
 
+// AttackConsole.tsx (一部抜粋)
 export default function AttackConsole(props: Props) {
-  const { darkPanelBase, targetInfoBase, hmacBoxBase, logAreaBase, attackStatus, running, crackedHmac, currentByteIndex, tryingChar, logs, scrollRef, runAttack, stopAttack, insecure } = props
+  const { attackStatus, running, crackedHmac, currentByteIndex, tryingChar, logs, runAttack, stopAttack } = props;
 
   return (
-    <div style={{ ...darkPanelBase, border: attackStatus === 'success' ? '2px solid #22c55e' : '2px solid #374151' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderBottom: '1px solid #374151', paddingBottom: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 700, fontSize: 14 }}>
-          <Terminal size={16} /> ATTACKER_CONSOLE
-        </div>
-        {attackStatus === 'success' && <span style={{ background: '#16a34a', color: '#fff', fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>SUCCESS</span>}
-      </div>
-
-      <div style={targetInfoBase}>
-        <div style={{ color: '#9ca3af', marginBottom: 4 }}>Target Payload (Tampered):</div>
-        <div style={{ color: '#ef4444', fontWeight: 700 }}>{`{ "role": "admin" }`}</div>
-        <div style={{ borderTop: '1px dashed #374151', marginTop: 8, paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
-          <span style={{ color: '#9ca3af' }}>Forging Signature:</span>
-          <span style={{ color: '#eab308', fontWeight: 700, letterSpacing: 1 }}>
-            {attackStatus === 'success' ? crackedHmac : '?? ?? ?? ??'}
-          </span>
-        </div>
-      </div>
-
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#9ca3af' }}>
-          <span>Brute-force Progress</span>
-          <span style={{ color: insecure ? '#f87171' : '#4ade80', fontWeight: 700 }}>{insecure ? '[VULNERABLE TARGET]' : '[SECURE TARGET]'}</span>
-        </div>
-
-        <div style={hmacBoxBase}>
-          {crackedHmac.split('').map((char, i) => (
-            <span key={i} style={{
-              width: 24, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              borderRadius: 4, fontWeight: 700, fontFamily: 'monospace', fontSize: 16,
-              background: i < currentByteIndex ? (attackStatus === 'success' ? '#22c55e' : '#064e3b') : '#374151',
-              color: i < currentByteIndex ? '#fff' : (i === currentByteIndex && running ? '#eab308' : '#6b7280'),
-              border: i === currentByteIndex && running ? '1px solid #eab308' : 'none'
+    <div style={{ ...props.darkPanelBase, position: 'relative' }}>
+      <div style={{ marginBottom: 15, padding: '10px', background: '#1e293b', borderRadius: 6 }}>
+        <h4 style={{ color: '#9ca3af', fontSize: 12, margin: '0 0 8px 0' }}>HMAC署名の検証中</h4>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+          {[...Array(8)].map((_, i) => (
+            <div key={i} style={{
+              width: 36, height: 44,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              borderRadius: 4, border: '1px solid #4b5563',
+              fontSize: 20, fontFamily: 'monospace',
+              background: i < currentByteIndex ? '#065f46' : (i === currentByteIndex && running ? '#854d0e' : '#1f2937'),
+              color: i < currentByteIndex ? '#34d399' : '#fff',
+              transition: 'all 0.2s'
             }}>
-              {i === currentByteIndex && running ? tryingChar : (i < currentByteIndex || attackStatus === 'success' ? char : '*')}
-            </span>
-          ))}
-        </div>
+             {i < currentByteIndex || attackStatus === 'success'
+  ? crackedHmac[i]
+  : (i === currentByteIndex && running ? tryingChar : '?')}
 
-        <div ref={scrollRef} style={logAreaBase}>
-          {logs.map((l, i) => (
-            <div key={i} style={{ marginBottom: 2, color: l.includes('SUCCESS') ? '#4ade80' : l.includes('LEAKAGE') ? '#eab308' : '#9ca3af' }}>{l}</div>
+            </div>
           ))}
-          {logs.length === 0 && <span style={{ opacity: 0.5 }}>Ready to initiate attack...</span>}
         </div>
       </div>
-
+      
+      {/* 攻撃ボタンの強調 */}
       <button
         onClick={running ? stopAttack : runAttack}
-        disabled={attackStatus === 'success' && !running}
         style={{
-          marginTop: 15, width: '100%', padding: '10px', borderRadius: 6, border: 'none', fontWeight: 700, cursor: attackStatus === 'success' ? 'default' : 'pointer',
-          background: running ? '#4b5563' : attackStatus === 'success' ? '#16a34a' : '#dc2626',
-          color: '#fff', fontSize: 14
+          width: '100%', padding: '12px', borderRadius: 8, border: 'none',
+          background: running ? '#ef4444' : '#3b82f6',
+          color: 'white', fontWeight: 'bold', cursor: 'pointer',
+          fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
         }}
       >
-        {running ? 'STOP ATTACK' : attackStatus === 'success' ? 'ACCESS GRANTED' : 'EXECUTE ATTACK'}
+        {running ? "攻撃を停止" : "タイミング解析を開始"}
       </button>
+      
+      {/* ログエリア */}
+      <div style={{ ...props.logAreaBase, marginTop: 15, fontSize: 12 }}>
+         {/* ログの内容 */}
+      </div>
     </div>
-  )
+  );
 }

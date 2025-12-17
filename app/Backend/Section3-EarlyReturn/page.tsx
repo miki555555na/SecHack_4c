@@ -91,34 +91,22 @@ export default function TimingAttackPage() {
                 <CardHeader>
                     <CardTitle>シミュレーション：時間差を利用したパスワード推測</CardTitle>
                     <CardDescription>
-                        <p>時間差が生まれる脆弱な実装と、安全な実装を比較しながら、機密情報が漏洩するリスクを体感しましょう。</p>
+                        <p>時間差が生まれる脆弱な実装と、安全な実装を比較しながら、パスワード比較処理において機密情報が漏洩するリスクを体感しましょう。</p>
                     </CardDescription> 
                 </CardHeader>
-
-                <CardContent>
-                    <CardAction>
-                            このデモは、<b>パスワード比較処理そのもの</b>に注目したものです。
-                            ログイン画面に限らず、
-                            <b>API トークン・署名・秘密値の比較</b>でも
-                            同じ問題が起こります。
-                            <br /><br />
-
-                            <span style={{ color:'#dc2626', fontWeight: 600 }}>脆弱な実装</span>では、
-                            文字が一致しなくなった時点で処理を終了するため、
-                            <b>一致している長さが実行時間に表れます</b>。
-                            <br /><br />
-
-                            一方、
-                            <span style={{color:'#138c40ff', fontWeight: 600 }}>安全な実装</span>では、
-                            入力内容に関係なく
-                            <b>必ず同じ回数の比較</b>を行います。
-                            その結果、処理時間から
-                            <b>推測に使える情報が得られなくなります</b>。
-                    </CardAction>    
+                <hr style={{ border: 'none', height: 1, background: '#e5e7eb', margin: '3px 0' }} />
+                <CardContent>             
 <div style={styles.comparison}>
   {/* 脆弱な実装 */}
   <div style={styles.comparisonColumn}>
-    <div
+    <p style={{ fontSize: 17, marginBottom: 12 }}>
+        <span style={{ color:'#dc2626', fontWeight: 600 }}>脆弱な実装</span>では、
+            文字が一致しなくなった時点で処理を終了するため、
+            <b>一致している長さが実行時間に表れます</b>。
+            <br /><br />
+
+    </p>
+<div
       style={{
         ...styles.codeContainer,
         background: '#fef2f2',
@@ -162,6 +150,13 @@ export default function TimingAttackPage() {
 
   {/* 安全な実装 */}
   <div style={styles.comparisonColumn}>
+     <p style={{ fontSize: 17, marginBottom: 12 }}>
+                            <span style={{color:'#138c40ff', fontWeight: 600 }}>安全な実装</span>では、
+                            入力内容に関係なく
+                            <b>必ず同じ回数の比較</b>を行います。
+                            その結果、処理時間から
+                            <b>推測に使える情報が得られなくなります</b>。
+    </p>
     <div
       style={{
         ...styles.codeContainer,

@@ -32,11 +32,15 @@ export default function ResponseChart({ rightPanelBase, chartData, insecure, run
             <XAxis dataKey="char" stroke="#9ca3af" tick={{ fontSize: 11 }} interval={0} />
             <YAxis stroke="#9ca3af" tick={{ fontSize: 11 }} unit="ms" />
             <Tooltip cursor={{ fill: '#f3f4f6' }} contentStyle={{ borderRadius: 6, border: '1px solid #e5e7eb', fontSize: 12 }} />
-            <Bar dataKey="time" radius={[2, 2, 0, 0]} animationDuration={200}>
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.isHit ? '#f97316' : (insecure ? '#3b82f6' : '#10b981')} />
-              ))}
-            </Bar>
+<Bar dataKey="time" radius={[2, 2, 0, 0]}>
+  {chartData.map((entry, index) => (
+    <Cell 
+      key={`cell-${index}`} 
+      fill={entry.isHit ? '#f97316' : '#3b82f6'} 
+      fillOpacity={entry.isHit ? 1 : 0.4}
+    />
+  ))}
+</Bar>
             {insecure && chartData.length > 0 && (
               <ReferenceLine y={Math.max(...chartData.map(d => d.time)) * 0.9} stroke="#ef4444" strokeDasharray="3 3" label={{ value: "Spike Detected", fill: "#ef4444", fontSize: 10 }} />
             )}
