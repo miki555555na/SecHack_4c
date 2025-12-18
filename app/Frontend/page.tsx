@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from 'react';
@@ -10,35 +9,40 @@ export default function FrontendPage() {
   const sections = [
     {
       number: 1,
-      title: 'ハードコードされた秘密鍵',
-      description: 'ソースコード内に埋め込まれたAPI鍵の流出リスク',
+      title: 'ハードコードされた秘密情報',
+      description: 'ソースコードに直接埋め込まれた情報が、どのようなリスクにつながるかを確認します。',
       href: '/Frontend/Section1-HardcodedSecrets'
     },
     {
       number: 2,
       title: 'XSS（クロスサイトスクリプティング）',
-      description: 'ユーザー入力の不適切な処理による悪意あるスクリプト実行',
+      description: 'ユーザー入力の扱い方によって、意図しないスクリプト実行が起こる仕組みを体験します。',
       href: '/Frontend/Section2-XSS'
     },
     {
       number: 3,
-      title: 'ブラウザキャッシュの時間差',
-      description: 'キャッシュヒット/ミスから生まれる実行時間差を用いた情報推測',
+      title: 'ブラウザキャッシュと処理時間の差',
+      description: 'キャッシュの有無によって生じる処理時間の違いが、どのように観測され得るかを見ていきます。',
       href: '/Frontend/Section3-BrowserCache'
     },
     {
       number: 4,
-      title: 'リソース読み込み時間差',
-      description: 'サブリソースタイミング攻撃によるクロスオリジン情報漏洩',
+      title: 'リソース読み込みのタイミング',
+      description: 'リソース取得のタイミング情報から、意図しない情報が推測される可能性について学びます。',
       href: '/Frontend/Section4-SubresourceTiming'
     }
   ];
 
   return (
     <div className="space-y-6">
-      <h1 style={{ fontSize: 36, fontWeight: 900, marginBottom: 24 }}>フロントエンド脆弱性を学ぶ</h1>
-      <p style={{ fontSize: 16, color: '#475569' }}>
-        クライアントサイドで陥りやすい4つのセキュリティ脆弱性を、実際に動かして学びます。
+      <h1 className="text-4xl font-black mb-6">
+        フロントエンドの実装とセキュリティ
+      </h1>
+
+      <p className="text-base text-slate-600">
+        フロントエンド実装で起こりやすい代表的なセキュリティ上の注意点を、
+        <br />
+        「脆弱な実装」と「改善後の実装」を比較しながら学びます。
       </p>
 
       <div className="grid gap-4">
@@ -46,17 +50,27 @@ export default function FrontendPage() {
           <Card key={section.number}>
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
-                <span style={{ background: '#f59e0b', color: '#fff', width: 40, height: 40, borderRadius: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                <span
+                  className="flex items-center justify-center font-bold text-white"
+                  style={{
+                    background: '#f59e0b',
+                    width: 40,
+                    height: 40,
+                    borderRadius: '9999px'
+                  }}
+                >
                   {section.number}
                 </span>
                 {section.title}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p style={{ margin: '0 0 16px 0', color: '#64748b' }}>{section.description}</p>
+              <p className="mb-4 text-slate-500">
+                {section.description}
+              </p>
               <Link href={section.href}>
-                <Button style={{ background: '#f59e0b', color: '#fff' }}>
-                  セクション {section.number} を始める →
+                <Button className="bg-amber-500 text-white">
+                  セクション {section.number} を見る →
                 </Button>
               </Link>
             </CardContent>
