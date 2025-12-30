@@ -24,12 +24,6 @@ export default function FrontendPage() {
       title: 'ブラウザキャッシュと処理時間の差',
       description: 'キャッシュの有無によって生じる処理時間の違いが、どのように観測され得るかを見ていきます。',
       href: '/Frontend/Section3-BrowserCache'
-    },
-    {
-      number: 4,
-      title: 'リソース読み込みのタイミング',
-      description: 'リソース取得のタイミング情報から、意図しない情報が推測される可能性について学びます。',
-      href: '/Frontend/Section4-SubresourceTiming'
     }
   ];
 
