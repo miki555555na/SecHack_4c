@@ -5,7 +5,7 @@ import { Terminal } from 'lucide-react'
 
 type Props = {
   logs: string[]
-  scrollRef: React.RefObject<HTMLDivElement> | null
+  scrollRef: React.RefObject<HTMLDivElement | null>
   running: boolean
   runAttack: () => void
   stopAttack: () => void
