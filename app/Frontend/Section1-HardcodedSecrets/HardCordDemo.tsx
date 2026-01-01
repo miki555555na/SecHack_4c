@@ -84,15 +84,15 @@ export function HardCordDemo() {
           <script dangerouslySetInnerHTML={{
             __html: `
               /* デバッグ用：API キーの設定　！！！本番環境では消すこと！！！ */
-              fetch("https://example.com/api", {
-                method: "GET",
-                headers: {
-                  "x-api-key": "hardcord-testkey-xyz123" /* TEST API KEY */
-                }
-              })
-                .then(res => res.json())
-                .then(data => console.log(data))
-                .catch(err => console.error(err));
+              // fetch("https://example.com/api", {
+              //   method: "GET",
+              //   headers: {
+              //     "x-api-key": "hardcord-testkey-xyz123" /* TEST API KEY */
+              //   }
+              // })
+              //   .then(res => res.json())
+              //   .then(data => console.log(data))
+              //   .catch(err => console.error(err));
             `
           }} />
           <InfoCard title="結果" description="デモの実行結果は下に表示されます。" >
