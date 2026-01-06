@@ -1,0 +1,24 @@
+name: Post Merged PRs to Mattermost
+
+on:
+  schedule:
+    # 毎日 9:00 AM UTC に実行 (必要に応じて調整)
+    - cron: '0 9 * * *'
+  workflow_dispatch: # 手動実行を許可
+
+jobs:
+  notify-merged-prs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Post merged PRs to Mattermost
+        uses: ./.github/actions/mattermost-pr-watcher
+        with:
+          mattermost_bot_token: ${{ secrets.MATTERMOST_BOT_TOKEN }}
+          mattermost_channel_id: ${{ secrets.MATTERMOST_CHANNEL_ID }}
+          mattermost_host: ${{ secrets.MATTERMOST_HOST }}
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          hours: 24
+          skip_if_no_prs: 'true'
