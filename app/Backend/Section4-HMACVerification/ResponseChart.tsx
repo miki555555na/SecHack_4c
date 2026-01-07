@@ -23,7 +23,7 @@ export default function ResponseChart({ rightPanelBase, chartData, insecure, run
           </h3>
           <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#6b7280' }}>{insecure ? "⚠️ 警告: 正解の文字で処理時間が突出しています" : "✓ 安全: 処理時間は一定です"}</p>
         </div>
-        {running && <div style={{ fontSize: 10, background: '#eff6ff', color: '#2563eb', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>Measuring...</div>}
+        
       </div>
 
       <div style={{ flex: 1, position: 'relative' }}>

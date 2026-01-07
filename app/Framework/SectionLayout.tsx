@@ -35,16 +35,15 @@ export default function SectionLayout({
         {/* ▲ やることリスト */}
 
         <header style={styles.header}>
-  <h1 style={styles.h1}>{title1}</h1>
-  {title2 && <h2 style={styles.h2}>{title2}</h2>}
-</header>
+            <h1 style={styles.h1}>{title1}</h1>
+            {title2 && <h2 style={styles.h2}>{title2}</h2>}
+        </header>
 
-{description && (
-  <div style={styles.description}>
-    {description}
-  </div>
-)}
-
+        {description && (
+        <div style={styles.description}>
+            {description}
+        </div>
+        )}
 
         {/* ▼ 各 Section の本体 */}
         <section
@@ -57,12 +56,13 @@ export default function SectionLayout({
             {children}
         </section>
         {/* ▲ Section内容 */}
+        <br />
 
         {/* ▼ まとめセクション */}
         {summary && (
-            <section style={{ ...styles.section, ...styles.summary }}>
+            <div style={{...styles.summary}}>
                 {summary}
-        </section>
+            </div>
         )}
         {/* ▲ まとめここまで */}
     </main>

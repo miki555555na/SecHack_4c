@@ -14,10 +14,8 @@ export const styles: { [k: string]: CSSProperties } = {
         top: 0,
         zIndex: 100,
         background: '#f5faffff',
-        borderBottom: '2px solid #aee2feff',
         boxShadow: '0 2px 8px #0001',
-        padding: '14px 0 10px 0',
-        marginBottom: 18
+        marginBottom: 25
     },
     header: {
         textAlign: 'center',
@@ -48,9 +46,14 @@ export const styles: { [k: string]: CSSProperties } = {
         border: '1px solid #ececec'
     },
     comparison: {
-        display: 'flex',
-        gap: 24,
-        marginTop: 20
+        display: 'grid',
+        gridTemplateColumns: '1fr 1px 1fr',
+        columnGap: 48,
+        marginTop: 16,
+        alignItems: 'stretch'
+    },
+    divider: {
+        background: '#e5e7eb'
     },
     comparisonColumn: {
         flex: 1,
@@ -121,7 +124,6 @@ export const styles: { [k: string]: CSSProperties } = {
     },
     summary: {
         background: '#f9fafb',
-        border: '1.5px solid #e5e7eb',
-        marginTop: 32
+        border: '1.5px  #e5e7eb',
     }
     };
